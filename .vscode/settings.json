@@ -1,3 +1,7 @@
 {
-    "cmake.sourceDirectory": "D:/学习/比赛/室外赛/代码/12.2"
+    "cmake.sourceDirectory": "D:/学习/比赛/室外赛/代码/12.2",
+    "files.associations": {
+        "vector": "cpp",
+        "xstring": "cpp"
+    }
 }

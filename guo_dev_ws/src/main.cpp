@@ -61,7 +61,7 @@ float servo_pwm; // 存储舵机PWM值
 
 //---------------发车信号定义-----------------------------------------------
 int find_first = 0; // 标记是否第一次找到蓝色挡板
-int fache_sign = 1; // 标记发车信号
+int fache_sign = 0; // 标记发车信号
 
 
 int bz_heighest = 0; // 避障高度
@@ -547,14 +547,14 @@ void blue_card_remove(void) // 输入为mask图像
 
         if (contours.size() == 0) // 如果没有轮廓
         {
-            fache_sign = 0; // 设置开始标志为0
+            fache_sign = 0; // 设置开始标志为1
             cout << "前进！" << endl; // 输出移动信息
             sleep(2); // 睡眠2秒
         }
     }
     else // 如果没有找到轮廓
     {
-        fache_sign = 0; // 设置开始标志为0
+        fache_sign = 1; // 设置开始标志为1
         cout << "蓝色挡板移开！" << endl; // 输出蓝色挡板移开信息
         sleep(2); // 睡眠2秒
     }
@@ -1035,6 +1035,10 @@ int main(void)
         auto start = std::chrono::high_resolution_clock::now();
         
         // 处理发车逻辑
+
+        // fache_sign == 0 && find_first == 0 时blue_card_find待机寻找蓝卡；
+        // 找到后find_first = 1,blue_card_remove判断是否移开挡板;
+        // 移开挡板fache_sign = 1,开始巡线；
         if (fache_sign == 0) // 如果开始标志为0
         {
             // 根据条件调用不同的函数
@@ -1048,7 +1052,7 @@ int main(void)
             }
 
         }
-        else // 如果开始标志不为1
+        else // 如果开始标志不为0
         {
 
 
