@@ -39,7 +39,7 @@ float servo_pwm; // 存储舵机PWM值
 
 //---------------发车信号定义-----------------------------------------------
 int find_first = 0; // 标记是否第一次找到蓝色挡板
-int fache_sign = 1; // 标记发车信号
+int fache_sign = 0; // 标记发车信号
 
 //---------------斑马线相关-------------------------------------------------
 int banma = 0; // 斑马线检测结果
@@ -299,8 +299,8 @@ void blue_card_find(void)  // 输入为mask图像
     Mat mask; // 存储掩码图像
 
     // 定义HSV范围 hsv颜色空间特点：色调H、饱和度S、亮度V
-    Scalar scalarl = Scalar(100, 43, 46); // HSV的低值
-    Scalar scalarH = Scalar(124, 255, 255); // HSV的高值 
+    Scalar scalarl = Scalar(105, 60, 60);  // HSV的低值
+    Scalar scalarH = Scalar(120, 255, 200); // HSV的高值 
     inRange(change_frame, scalarl, scalarH, mask); // 创建掩码
 
     vector<vector<Point>> contours; // 存储轮廓的向量
@@ -322,10 +322,10 @@ void blue_card_find(void)  // 输入为mask图像
         }
 
         contours = newContours; // 更新轮廓向量
-
+        cout << "检测到蓝色物体：面积为" << contourArea(contours[0]) << endl;
         if (contours.size() > 0) // 如果新的轮廓向量不为空
         {
-            if (contourArea(contours[0]) > 500) // 如果最大的轮廓面积大于500
+            if (contourArea(contours[0]) > 300) // 如果最大的轮廓面积大于300
             {
                 cout << "找到蓝色挡板 达到面积！" << endl; // 输出找到最大的蓝色物体
                 // Point2f center; // 存储中心点
@@ -357,42 +357,42 @@ void blue_card_remove(void) // 输入为mask图像
     Mat mask; // 存储掩码图像
 
     // 定义HSV范围 hsv颜色空间特点：色调H、饱和度S、亮度V
-    Scalar scalarl = Scalar(100, 43, 46); // HSV的低值
-    Scalar scalarH = Scalar(124, 255, 255); // HSV的高值 
+    Scalar scalarl = Scalar(105, 60, 60);  // HSV的低值
+    Scalar scalarH = Scalar(120, 255, 200); // HSV的高值 
     inRange(change_frame, scalarl, scalarH, mask); // 创建掩码
 
     vector<vector<Point>> contours; // 定义轮廓向量
     vector<Vec4i> hierarcy; // 定义层次结构向量
     findContours(mask, contours, hierarcy, RETR_EXTERNAL, CHAIN_APPROX_NONE); // 查找轮廓
-    if (contours.size() > 0) // 如果找到轮廓
+
+    // 过滤出“有效蓝色轮廓”（面积足够大且位置合理）
+    vector<vector<Point>> validContours;
+    for (const auto &contour : contours) 
     {
-        sort(contours.begin(), contours.end(), Contour_Area); // 按面积排序轮廓
-        vector<vector<Point>> newContours; // 定义新的轮廓向量
-        for (const vector<Point> &contour : contours) // 遍历每个轮廓
-        {
-            Point2f center; // 定义中心点
-            float radius; // 定义半径
-            minEnclosingCircle(contour, center, radius); // 找到最小包围圆
-            if (center.y > 90 && center.y < 160) // 如果中心点在指定范围内
-            {
-                newContours.push_back(contour); // 添加到新的轮廓向量
-            }
-        }
+        // 过滤面积过小的干扰
+        double area = contourArea(contour);
+        if (area < 300) 
+            continue;
 
-        contours = newContours; // 更新轮廓向量
-
-        if (contours.size() == 0) // 如果没有轮廓
+        Point2f center;
+        float radius;
+        minEnclosingCircle(contour, center, radius);
+        if (center.y > 60 && center.y < 190)  
         {
-            fache_sign = 1; // 设置开始标志为0
-            cout << "前进！" << endl; // 输出移动信息
-            sleep(2); // 睡眠2秒
+            validContours.push_back(contour);
         }
     }
-    else // 如果没有找到轮廓
+
+    // 判断是否存在“有效蓝色轮廓”：若不存在，说明挡板已移开
+    if (validContours.empty()) 
     {
-        fache_sign = 1; // 设置开始标志为0
-        cout << "蓝色挡板移开！" << endl; // 输出蓝色挡板移开信息
-        sleep(2); // 睡眠2秒
+        fache_sign = 1;
+        cout << "蓝色挡板已移开，开始巡线！" << endl;
+        usleep(500000);  
+    } 
+    else 
+    {
+        cout << "仍检测到蓝色物体（面积：" << contourArea(validContours[0]) << "），等待移开..." << endl;
     }
 }
 
@@ -550,32 +550,44 @@ void motor_park(){
 // 控制舵机电机
 void motor_servo_contral()
 {   
-    float servo_pwm_now; // 存储当前舵机PWM值
-    if (banma == 0 && flag_banma == 0 ){
-        servo_pwm_now = servo_pd(160); // 计算舵机PWM
-        if(number < 10){
-            gpioPWM(13, 13000); // 设置电机PWM
-        }else if (number < 500){
-            gpioPWM(13, 13000); // 设置电机PWM
-            cout << "巡线-----------------------弯道1 PWM:  " << servo_pwm_now << endl;
-        }else if (number < 550){
-            gpioPWM(13, 13000); // 设置电机PWM
-            cout << "巡线-----------------------弯道2 PWM:  " << servo_pwm_now << endl;
-        }else if (number < 600){
-            gpioPWM(13, 12000); // 设置电机PWM
-            cout << "巡线-----------------------弯道3 PWM:  " << servo_pwm_now << endl;
-        }else{
-            gpioPWM(13, 11800); // 设置电机PWM
-            cout << "巡线-----------------------弯道4 PWM:  " << servo_pwm_now << endl;
+    float servo_pwm_now; 
+    // 只有发车信号激活（fache_sign = 1）时，才执行巡线控制
+    if (fache_sign == 1) { 
+        if (banma == 0 && flag_banma == 0 ){
+            // 确保 mid 向量有足够数据（避免越界）
+            if (mid.size() < 26) {
+                cerr << "mid 向量数据不足，使用默认角度" << endl;
+                servo_pwm_now = servo_pwm_mid;
+            } else {
+                servo_pwm_now = servo_pd(160); 
+            }
+            if(number < 10){
+                gpioPWM(13, 13000); 
+            }else if (number < 500){
+                gpioPWM(13, 13000); 
+                cout << "巡线-----------------------弯道1 PWM:  " << servo_pwm_now << endl;
+            }else if (number < 550){
+                gpioPWM(13, 13000); 
+                cout << "巡线-----------------------弯道2 PWM:  " << servo_pwm_now << endl;
+            }else if (number < 600){
+                gpioPWM(13, 12000); 
+                cout << "巡线-----------------------弯道3 PWM:  " << servo_pwm_now << endl;
+            }else{
+                gpioPWM(13, 11800); 
+                cout << "巡线-----------------------弯道4 PWM:  " << servo_pwm_now << endl;
+            }
+            gpioPWM(servo_pin, servo_pwm_now);
         }
-        gpioPWM(servo_pin, servo_pwm_now);
-    }
-    else if(banma == 1 && flag_banma == 0){ // 如果检测到斑马线 且斑马线flag未完成{
-        flag_banma = 1;
-        banma_stop();
-        system("sudo -u pi /home/pi/.nvm/versions/node/v12.22.12/bin/node /home/pi/network-rc/we2hdu.js"); // 播放音频文件
-        number = 0;
-        // sleep(5);
+        else if(banma == 1 && flag_banma == 0){ 
+            flag_banma = 1;
+            banma_stop();
+            system("sudo -u pi /home/pi/.nvm/versions/node/v12.22.12/bin/node /home/pi/network-rc/we2hdu.js");
+            number = 0;
+        }
+    } else {
+        // 发车前（fache_sign = 0）：停止电机和舵机，避免无效操作
+        gpioPWM(motor_pin, motor_pwm_duty_cycle_unlock); // 电机解锁但不转动
+        gpioPWM(servo_pin, servo_pwm_mid); // 舵机回中
     }
 }
 
